@@ -1,0 +1,1 @@
+export function ContentCard({title,children}:{title:string;children:React.ReactNode}){return <section className="rounded-2xl bg-white p-5 shadow-sm"><h3 className="mb-3 font-semibold">{title}</h3>{children}</section>}
