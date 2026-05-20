@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
 type Toast = { id: number; message: string };
 const ToastCtx = createContext<{toast:(m:string)=>void; toasts:Toast[]; remove:(id:number)=>void}>({toast:()=>{},toasts:[],remove:()=>{}});

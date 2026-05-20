@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -16,6 +16,6 @@ model SavedContent {
   product          String
   audience         String
   extraNotes       String?
-  generatedContent Json
+  generatedContent String
   createdAt        DateTime @default(now())
 }
