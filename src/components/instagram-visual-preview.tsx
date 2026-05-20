@@ -5,14 +5,18 @@ import {
   ChevronRight,
   Clapperboard,
   Heart,
+  ImagePlus,
   MessageCircle,
   MoreHorizontal,
   Play,
+  RotateCcw,
   Send,
   Sparkles,
+  Type,
   Volume2,
 } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ChangeEvent } from 'react';
 import type { GeneratedContent, GenerateInput, VisualPreview } from '@/types/content';
 import { createLocalVisualPreview } from '@/lib/visual-preview-data';
 
@@ -20,6 +24,7 @@ type InstagramVisualPreviewProps = {
   content: GeneratedContent;
   context?: Partial<GenerateInput>;
   visualPreview?: VisualPreview | null;
+  onVisualPreviewChange?: (preview: VisualPreview) => void;
 };
 
 const clamp = (lines: number): CSSProperties => ({
@@ -36,6 +41,12 @@ function getImageStyle(preview: VisualPreview, darken = 0.46): CSSProperties {
     backgroundPosition: 'center',
     backgroundSize: 'cover',
   };
+}
+
+function getSourceLabel(source: VisualPreview['source']): string {
+  if (source === 'ai') return 'Imagem IA';
+  if (source === 'upload') return 'Imagem enviada';
+  return 'Preview local';
 }
 
 function ProfileRow({ preview, compact = false }: { preview: VisualPreview; compact?: boolean }) {
@@ -279,10 +290,90 @@ export function InstagramVisualPreview({
   content,
   context,
   visualPreview,
+  onVisualPreviewChange,
 }: InstagramVisualPreviewProps) {
-  const preview = visualPreview ?? createLocalVisualPreview({ ...context, format: content.format }, content);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const restorablePreviewRef = useRef<VisualPreview | null>(null);
+  const basePreview = useMemo(
+    () => visualPreview ?? createLocalVisualPreview({ ...context, format: content.format }, content),
+    [content, context, visualPreview],
+  );
+  const [preview, setPreview] = useState<VisualPreview>(basePreview);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const isVertical = preview.aspectRatio === '9:16';
   const isPlanner = preview.surface === 'planner' || preview.surface === 'ideas';
+
+  useEffect(() => {
+    if (basePreview.source !== 'upload') {
+      restorablePreviewRef.current = basePreview;
+    }
+
+    setPreview(basePreview);
+    setUploadError(null);
+  }, [basePreview]);
+
+  const updatePreview = (updates: Partial<VisualPreview>) => {
+    const next = { ...preview, ...updates };
+    setPreview(next);
+    onVisualPreviewChange?.(next);
+  };
+
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Escolha um arquivo de imagem.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setUploadError('A imagem precisa ter até 8 MB.');
+      event.target.value = '';
+      return;
+    }
+
+    if (preview.source !== 'upload') {
+      restorablePreviewRef.current = preview;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        setUploadError('Não foi possível carregar a imagem.');
+        return;
+      }
+
+      setUploadError(null);
+      updatePreview({
+        imageDataUrl: reader.result,
+        source: 'upload',
+        alt: `Imagem enviada para ${preview.meta.format} sobre ${preview.meta.product}`,
+      });
+    };
+    reader.onerror = () => setUploadError('Não foi possível carregar a imagem.');
+    reader.readAsDataURL(file);
+  };
+
+  const restoreGeneratedImage = () => {
+    const originalPreview = restorablePreviewRef.current ?? createLocalVisualPreview(
+      { ...context, format: content.format },
+      content,
+    );
+    const restoredPreview = {
+      ...preview,
+      imageDataUrl: originalPreview.imageDataUrl,
+      source: originalPreview.source,
+      alt: originalPreview.alt,
+      error: originalPreview.error,
+    };
+    setPreview(restoredPreview);
+    onVisualPreviewChange?.(restoredPreview);
+    restorablePreviewRef.current = originalPreview;
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   return (
     <section className="overflow-hidden rounded-2xl bg-slate-950 p-4 text-white shadow-sm">
@@ -305,7 +396,7 @@ export function InstagramVisualPreview({
                 style={{ backgroundColor: preview.themeColor }}
               >
                 <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                {preview.source === 'ai' ? 'Imagem IA' : 'Preview local'}
+                {getSourceLabel(preview.source)}
               </span>
               <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-white/70">
                 {preview.aspectRatio}
@@ -316,7 +407,10 @@ export function InstagramVisualPreview({
             </div>
 
             <div>
-              <p className="text-xs font-semibold uppercase text-white/60">Preview Instagram</p>
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase text-white/60">
+                <Type className="h-3.5 w-3.5" aria-hidden />
+                Escrita do preview
+              </p>
               <h2 className="mt-2 text-2xl font-bold leading-tight" style={clamp(3)}>
                 {preview.title}
               </h2>
@@ -332,9 +426,77 @@ export function InstagramVisualPreview({
               </div>
             )}
 
+            <div className="grid gap-3 rounded-2xl border border-white/10 bg-slate-900/70 p-3">
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-white/50">Título</span>
+                <input
+                  value={preview.title}
+                  onChange={(event) => updatePreview({ title: event.target.value })}
+                  className="rounded-xl border border-white/10 bg-white px-3 py-2 text-sm font-semibold text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                />
+              </label>
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-white/50">Texto na imagem</span>
+                <textarea
+                  value={preview.overlayText}
+                  rows={3}
+                  onChange={(event) => updatePreview({ overlayText: event.target.value })}
+                  className="resize-none rounded-xl border border-white/10 bg-white px-3 py-2 text-sm font-semibold leading-relaxed text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                />
+              </label>
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-white/50">Legenda</span>
+                <textarea
+                  value={preview.caption}
+                  rows={4}
+                  onChange={(event) => updatePreview({ caption: event.target.value })}
+                  className="resize-none rounded-xl border border-white/10 bg-white px-3 py-2 text-sm leading-relaxed text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                />
+              </label>
+              <label className="grid gap-1.5">
+                <span className="text-xs font-semibold uppercase text-white/50">CTA</span>
+                <input
+                  value={preview.cta ?? ''}
+                  onChange={(event) => updatePreview({ cta: event.target.value })}
+                  className="rounded-xl border border-white/10 bg-white px-3 py-2 text-sm font-semibold text-slate-950 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                />
+              </label>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="sr-only"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-blue-50"
+                >
+                  <ImagePlus className="h-4 w-4" aria-hidden />
+                  Upload da imagem
+                </button>
+                <button
+                  type="button"
+                  onClick={restoreGeneratedImage}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden />
+                  Restaurar
+                </button>
+              </div>
+              {uploadError && (
+                <p className="mt-2 text-xs font-medium text-amber-100">{uploadError}</p>
+              )}
+            </div>
+
             {preview.source === 'local' && preview.error && (
-              <p className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
-                A imagem da IA não ficou disponível agora; o app montou uma composição local para manter o preview usável.
+              <p className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs leading-relaxed text-white/65">
+                Usando a imagem local do preview. Você pode enviar outra imagem quando quiser.
               </p>
             )}
           </div>

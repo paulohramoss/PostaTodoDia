@@ -221,10 +221,12 @@ export function GeneratedContentPreview({
   content,
   context,
   visualPreview,
+  onVisualPreviewChange,
 }: {
   content: unknown;
   context?: Partial<GenerateInput>;
   visualPreview?: VisualPreview | null;
+  onVisualPreviewChange?: (preview: VisualPreview) => void;
 }) {
   if (!content || typeof content !== 'object' || !('format' in content)) {
     return (
@@ -238,7 +240,12 @@ export function GeneratedContentPreview({
 
   return (
     <div className="space-y-6">
-      <InstagramVisualPreview content={data} context={context} visualPreview={visualPreview} />
+      <InstagramVisualPreview
+        content={data}
+        context={context}
+        visualPreview={visualPreview}
+        onVisualPreviewChange={onVisualPreviewChange}
+      />
 
       <div className="space-y-4">
         {data.format === 'Stories'           && <StoriesPreview  data={data} />}

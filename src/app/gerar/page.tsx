@@ -181,6 +181,7 @@ function GerarForm() {
             content={result}
             context={watch() as unknown as GenerateInput}
             visualPreview={visualPreview}
+            onVisualPreviewChange={setVisualPreview}
           />
         </ContentCard>
       )}

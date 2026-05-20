@@ -101,7 +101,7 @@ export type InstagramPreviewSurface =
 export type VisualPreview = {
   surface: InstagramPreviewSurface;
   aspectRatio: '1:1' | '9:16';
-  source: 'ai' | 'local';
+  source: 'ai' | 'local' | 'upload';
   imageDataUrl?: string;
   prompt: string;
   alt: string;
