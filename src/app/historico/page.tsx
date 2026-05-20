@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { EmptyState } from '@/components/empty-state';
 import { HistoryList } from '@/components/history-list';
 import { listContents } from '@/server/actions/content-actions';
